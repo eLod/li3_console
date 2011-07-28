@@ -5,10 +5,15 @@ namespace li3_console\console;
 use lithium\core\Libraries;
 
 abstract class Executor extends \lithium\core\Object {
-    protected $_vars = array();
     protected $_use_classes = array();
     protected $_resources_path;
-    protected $_autoConfig = array('use_classes' => 'merge', 'resources_path');
+    protected $_result_prompt;
+    protected $_output;
+    protected $_error;
+    protected $_classes = array(
+	'formatter' => 'li3_console\console\Formatter',
+    );
+    protected $_autoConfig = array('use_classes' => 'merge', 'resources_path', 'result_prompt', 'classes' => 'merge', 'output', 'error');
 
     public function __construct(array $config = array()) {
 	$defaults = array(
@@ -19,6 +24,8 @@ abstract class Executor extends \lithium\core\Object {
 	    ),
 	    'use_classes' => array(),
 	    'resources_path' => null,
+	    'result_prompt' => '=> ',
+	    'classes' => $this->_classes,
 	);
 	parent::__construct($config + $defaults);
     }
@@ -30,14 +37,10 @@ abstract class Executor extends \lithium\core\Object {
 	}
     }
 
-    public function run($code) {
-	return $this->execute($code);
-    }
+    abstract public function execute(array $code);
 
     public function stop() {
     }
-
-    abstract protected function execute(array $code);
 
     protected function codeString(array $code, array $options = array()) {
 	$options += array(
@@ -45,6 +48,7 @@ abstract class Executor extends \lithium\core\Object {
 	    "add_uses" => true,
 	    "enclose_php" => false,
 	    "glue" => PHP_EOL,
+	    "add_bootstrap" => false,
 	);
 	if ($options["add_return"]) {
 	    $level = array_reduce($code, function($level, $line) {
@@ -66,8 +70,13 @@ abstract class Executor extends \lithium\core\Object {
 			break;
 		    }
 		}
-		$code[$line] = substr($code[$line], 0, $foundpos + 1)." return (".trim(substr($code[$line], $foundpos + 1));
-		$code[count($code) - 1] .= ");";
+		$returning = trim(substr($code[$line], $foundpos + 1));
+		if (!preg_match('/^(echo|return|unset)/', $returning)) {
+		    $code[$line] = substr($code[$line], 0, $foundpos + 1)." return (".$returning;
+		    $code[count($code) - 1] .= ");";
+		} else {
+		    $code[] = ";return null;";
+		}
 	    } else {
 		$code[] = ";return null;";
 	    }
@@ -75,69 +84,34 @@ abstract class Executor extends \lithium\core\Object {
 	if ($options["add_uses"]) {
 	    $code = array_merge(array_map(function ($class) { return "use {$class};"; }, $this->_use_classes), array(""), $code);
 	}
+	if ($options["add_bootstrap"]) {
+	    $bootstrap = $options["add_bootstrap"] == true ? LITHIUM_APP_PATH . '/config/bootstrap.php' : $options["add_bootstrap"];
+	    $code = array_merge(array_map(function ($file) { return "require \"{$file}\";"; }, (array) $bootstrap), array(""), $code);
+	}
 	if ($options["enclose_php"]) {
 	    $code = array_merge(array("<?php", ""), $code, array("", "?>"));
 	}
 	return join($options["glue"], $code);
     }
 
-    protected function extractAndStoreVars($code, array $filter_names = array ()) {
-	$filtered = array_merge ($this->varNames(), array('this'), $filter_names);
-	foreach ($this->extractVarNames($code) as $name) {
-	    if (!in_array($name, $filtered)) {
-		$this->setVar($name, null);
-	    }
-	}
-    }
-
-    protected function extractVarNames(array $code) {
-	$code_str = "<?php\n" . join("\n", $code) . "\n?>\n";
-	$tokens = token_get_all($code_str);
-	$declaring_function = false;
-	$declaring_function_opening_found = false;
-	$level = 0;
-	$varnames = array();
-	foreach($tokens as $tok) {
-	    if (count($tok) > 1) {
-		$type = $tok[0];
-		$token = trim($tok[1]);
-	    } else {
-		$type = false;
-		$token = trim($tok[0]);
-	    }
-	    if ($token == "{") {
-		$level += 1;
-	    } else if ($token == "}") {
-		$level -= 1;
-	    } else if ($type == T_FUNCTION) {
-		$declaring_function = true;
-	    } else if ($token == "(" && $declaring_function) {
-		$declaring_function_opening_found = true;
-	    } else if ($token == ")" && $declaring_function_opening_found) {
-		$declaring_function = false;
-		$declaring_function_opening_found = false;
-	    }
-	    if ($type == T_VARIABLE && $level == 0 && !$declaring_function) {
-		$varnames[] = substr($token, 1);
-	    }
-	}
-	return array_unique($varnames);
-    }
-
-    protected function setVar($name, $val) {
-	$this->_vars[$name] = $val;
-    }
-
-    protected function getVar($name = null) {
-	return array_key_exists($name, $this->_vars) ? $this->_vars[$name] : null;
-    }
-
-    protected function varNames() {
-	return array_keys($this->_vars);
-    }
-
     protected function resource($name) {
 	return $this->_resources_path.$name;
+    }
+
+    protected function out($output = null, $options = array('nl' => 1)) {
+	if (is_callable($this->_output)) {
+	    return call_user_func($this->_output, $output, $options);
+	} else {
+	    return false;
+	}
+    }
+
+    protected function error($output = null, $options = array('nl' => 1)) {
+	if (is_callable($this->_error)) {
+	    return call_user_func($this->_error, $output, $options);
+	} else {
+	    return false;
+	}
     }
 }
 

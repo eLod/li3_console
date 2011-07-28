@@ -8,7 +8,7 @@ class Readline extends \li3_console\console\Shell {
     protected $_use_history;
     protected $_history_file;
     protected $_use_completion;
-    protected $_autoConfig = array('prompts' => 'merge', 'exit_command', 'use_history', 'history_file', 'use_completion');
+    protected $_autoConfig = array('output', 'prompts' => 'merge', 'exit_command', 'use_history', 'history_file', 'use_completion');
 
     public function __construct(array $config = array()) {
 	$defaults = array(
