@@ -1,1 +1,0 @@
-$foo = 3+4; $bar = array(); $baz = "baz"
