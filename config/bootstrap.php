@@ -2,6 +2,9 @@
 
 use lithium\core\Libraries;
 
+/**
+ * Check if resources directory is writable, needed for storing temporary files.
+ */
 $res_dir = Libraries::get('app', 'resources') . '/tmp/console';
 if (!is_dir($res_dir) || !is_writable($res_dir)) {
     trigger_error(

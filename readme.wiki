@@ -1,5 +1,3 @@
-# Li3 console
-
 Lithium console: console command to interact with your li3 application.
 
 **Please note:** this code is experimental and is in a very early stage, do not use it in production.
@@ -20,10 +18,3 @@ Lithium console: console command to interact with your li3 application.
     [development]> q
     Exiting.
 
-## Credits
-
-Thanks to [nateabele](https://github.com/nateabele), [daschl](https://github.com/daschl), [masom](https://github.com/masom) and the lively [li3](http://lithify.me) community.
-
-## Copyright
-
-See LICENSE.txt for details.
